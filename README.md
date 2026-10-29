@@ -23,7 +23,7 @@ I'm passionate about building **clean, responsive, and user-friendly** web exper
 - 🔭 Currently working on **Frontend projects** (HTML, CSS, JavaScript)
 - 🐚 Exploring deeper into **Web Development** and **Python**
 - 💡 Always learning new technologies and improving my craft
-- 📫 Reach me: **[your.email@example.com](mailto:your.email@example.com)** · [LinkedIn](https://linkedin.com/in/your-profile)
+- 📫 Reach me: **[panizoladhajiali@gmail.com](mailto:panizoladhajiali@gmail.com)**
 
 ---
 
@@ -51,7 +51,7 @@ I'm passionate about building **clean, responsive, and user-friendly** web exper
 ## 🐠 My Live Project
 
 <p align="center">
-  <a href="https://your-live-project-link.com">
+  <a href="https://pnz-ol.github.io/final_project/">
     <img src="https://img.shields.io/badge/🚀%20VIEW%20LIVE%20PROJECT-00b4d8?style=for-the-badge&logoColor=white" alt="Live project" />
   </a>
 </p>
