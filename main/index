@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Shark Game</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #03045e; overflow: hidden; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const c = document.getElementById('c'), x = c.getContext('2d');
+let W, H;
+function resize() { W = c.width = innerWidth; H = c.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+let best = 0;
+try { best = +localStorage.getItem('sharkBest') || 0; } catch (e) {}
+
+// shark shape (same look as the README animation)
+const P = {
+  tail:  new Path2D('M-20 0 L-34 -11 L-30 0 L-34 11 Z'),
+  body:  new Path2D('M-22 0 C-12 -12 12 -12 26 0 C12 9 -12 10 -22 0 Z'),
+  belly: new Path2D('M-20 2 C-8 8 12 8 24 2 C12 10 -10 11 -20 2 Z'),
+  dorsal:new Path2D('M-3 -9 L5 -20 L10 -9 Z'),
+  fin:   new Path2D('M2 4 L-5 13 L8 6 Z')
+};
+
+let state = 'start', sh, fish, jel, score, lives, hit = 0, t = 0;
+const keys = {}; let tx = null, ty = null;
+const bubbles = Array.from({ length: 28 }, () => ({ x: Math.random(), y: Math.random(), r: 1 + Math.random() * 4, v: .0006 + Math.random() * .0012 }));
+
+function reset() {
+  sh = { x: W / 2, y: H / 2, vx: 0, vy: 0, dir: 1, bite: 0 };
+  fish = []; jel = []; score = 0; lives = 3; hit = 0; t = 0; tx = ty = null; state = 'play';
+}
+
+addEventListener('pointermove', e => { tx = e.clientX; ty = e.clientY; });
+addEventListener('pointerdown', e => { tx = e.clientX; ty = e.clientY; if (state !== 'play') reset(); });
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase(); keys[k] = true;
+  if (k.startsWith('arrow') || k === ' ') e.preventDefault();
+  if (state !== 'play' && (k === ' ' || k === 'enter')) reset();
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function spawnFish() {
+  const l = Math.random() < .5;
+  fish.push({ x: l ? -30 : W + 30, y: 50 + Math.random() * (H - 100), v: (1.2 + Math.random() * 1.6 + score / 40) * (l ? 1 : -1),
+    c: ['#ffd166', '#ff9f1c', '#ff6b6b', '#caf0f8'][Math.random() * 4 | 0], s: 8 + Math.random() * 6 });
+}
+function spawnJelly() { jel.push({ x: 30 + Math.random() * (W - 60), y: -40, v: .9 + Math.random() + score / 60, ph: Math.random() * 6 }); }
+
+function update() {
+  t++;
+  let ax = (keys['arrowright'] || keys['d'] ? 1 : 0) - (keys['arrowleft'] || keys['a'] ? 1 : 0);
+  let ay = (keys['arrowdown'] || keys['s'] ? 1 : 0) - (keys['arrowup'] || keys['w'] ? 1 : 0);
+  if (ax || ay) { tx = ty = null; sh.vx += ax * .7; sh.vy += ay * .7; }
+  else if (tx !== null) {
+    const dx = tx - sh.x, dy = ty - sh.y, d = Math.hypot(dx, dy);
+    if (d > 10) { sh.vx += dx / d * .75; sh.vy += dy / d * .75; }
+  }
+  sh.vx *= .92; sh.vy *= .92;
+  sh.x = Math.min(W - 20, Math.max(20, sh.x + sh.vx));
+  sh.y = Math.min(H - 20, Math.max(20, sh.y + sh.vy));
+  if (Math.abs(sh.vx) > .3) sh.dir = sh.vx > 0 ? 1 : -1;
+  if (sh.bite > 0) sh.bite--; if (hit > 0) hit--;
+
+  if (Math.random() < .03 + score / 3000) spawnFish();
+  if (Math.random() < .008 + score / 6000) spawnJelly();
+
+  fish = fish.filter(f => {
+    f.x += f.v;
+    if (Math.hypot(f.x - sh.x - sh.dir * 22, f.y - sh.y) < 28 + f.s / 2) { score++; sh.bite = 8; return false; }
+    return f.x > -50 && f.x < W + 50;
+  });
+  jel = jel.filter(j => {
+    j.y += j.v; j.x += Math.sin(t / 30 + j.ph) * .8;
+    if (Math.hypot(j.x - sh.x, j.y - sh.y) < 30) {
+      lives--; hit = 25;
+      if (lives <= 0) { state = 'over'; if (score > best) { best = score; try { localStorage.setItem('sharkBest', best); } catch (e) {} } }
+      return false;
+    }
+    return j.y < H + 50;
+  });
+}
+
+function drawShark() {
+  x.save(); x.translate(sh.x, sh.y); x.scale(sh.dir * 2.2, 2.2);
+  x.rotate(Math.max(-.3, Math.min(.3, sh.vy * .05)) * sh.dir);
+  x.fillStyle = '#5b7c93'; x.fill(P.tail); x.fill(P.dorsal); x.fill(P.fin);
+  x.fillStyle = '#6f93aa'; x.fill(P.body);
+  x.fillStyle = '#e8f4f8'; x.fill(P.belly);
+  x.fillStyle = '#03045e'; x.beginPath(); x.arc(18, -3, 2, 0, 7); x.fill();
+  x.strokeStyle = '#03045e'; x.lineWidth = 1; x.beginPath();
+  x.moveTo(26, 0); x.quadraticCurveTo(20, sh.bite ? 9 : 4, 14, 3); x.stroke();
+  x.restore();
+}
+
+function draw() {
+  const g = x.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0077b6'); g.addColorStop(1, '#03045e');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+
+  x.fillStyle = 'rgba(202,240,248,.35)';
+  bubbles.forEach(b => { b.y -= b.v; if (b.y < -.05) b.y = 1.05; x.beginPath(); x.arc(b.x * W, b.y * H, b.r, 0, 7); x.fill(); });
+
+  fish.forEach(f => {
+    x.save(); x.translate(f.x, f.y); x.scale(f.v > 0 ? 1 : -1, 1);
+    x.fillStyle = f.c; x.beginPath(); x.ellipse(0, 0, f.s * 1.3, f.s * .7, 0, 0, 7); x.fill();
+    x.beginPath(); x.moveTo(-f.s, 0); x.lineTo(-f.s * 2, -f.s * .7); x.lineTo(-f.s * 2, f.s * .7); x.fill();
+    x.fillStyle = '#03045e'; x.beginPath(); x.arc(f.s * .6, -f.s * .15, 1.6, 0, 7); x.fill();
+    x.restore();
+  });
+
+  jel.forEach(j => {
+    x.fillStyle = 'rgba(255,120,200,.85)'; x.beginPath(); x.arc(j.x, j.y, 20, Math.PI, 0); x.fill();
+    x.strokeStyle = 'rgba(255,160,220,.8)'; x.lineWidth = 2;
+    for (let i = -12; i <= 12; i += 8) { x.beginPath(); x.moveTo(j.x + i, j.y); x.quadraticCurveTo(j.x + i + Math.sin(t / 8 + i) * 6, j.y + 14, j.x + i, j.y + 28); x.stroke(); }
+  });
+
+  if (state !== 'start') drawShark();
+  if (hit) { x.fillStyle = `rgba(255,0,60,${hit / 80})`; x.fillRect(0, 0, W, H); }
+
+  x.fillStyle = '#fff'; x.font = 'bold 22px Segoe UI, Arial'; x.textAlign = 'left';
+  x.fillText('Score: ' + score, 18, 34);
+  x.fillText('Lives: ' + '\u2665 '.repeat(Math.max(lives, 0)), 18, 62);
+  x.textAlign = 'right'; x.fillStyle = '#90e0ef'; x.fillText('Best: ' + best, W - 18, 34);
+
+  if (state !== 'play') {
+    x.fillStyle = 'rgba(3,4,94,.6)'; x.fillRect(0, 0, W, H); x.textAlign = 'center'; x.fillStyle = '#fff';
+    x.font = 'bold 44px Segoe UI, Arial';
+    x.fillText(state === 'start' ? 'SHARK GAME' : 'GAME OVER', W / 2, H / 2 - 50);
+    x.font = '22px Segoe UI, Arial'; x.fillStyle = '#caf0f8';
+    if (state === 'over') x.fillText('Score: ' + score, W / 2, H / 2 - 10);
+    x.fillText('Eat the fish, avoid the pink jellyfish!', W / 2, H / 2 + 28);
+    x.fillText('Move: mouse / touch / arrow keys / WASD', W / 2, H / 2 + 60);
+    x.fillStyle = '#48cae4'; x.font = 'bold 24px Segoe UI, Arial';
+    x.fillText(state === 'start' ? 'Click or press Space to start' : 'Click or press Space to play again', W / 2, H / 2 + 105);
+  }
+}
+
+(function loop() { if (state === 'play') update(); draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
